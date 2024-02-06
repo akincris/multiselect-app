@@ -3,25 +3,38 @@ import { ChevronDownIcon } from "@heroicons/react/20/solid";
 import { ICharacter } from "../interfaces/character";
 import { MultiValue } from "./MultiValue";
 import { getFilteredCharacters } from "../api/characters";
+import { debounce } from "lodash";
+import TableSkeleton from "./Skeleton";
 
 export const MultiSelect = () => {
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<ICharacter[]>([]);
   const [enteredValues, setEnteredValues] = useState<ICharacter[]>([]);
 
-  useEffect(() => {
+  const debouncedQuery = debounce(() => {
     if (input) {
-      getFilteredCharacters({ name: input }).then((res) => {
-        if (res) {
-          setResults(res.data.results);
-        } else {
-          setResults([]);
-        }
-      });
+      getFilteredCharacters({ name: input })
+        .then((res) => {
+          if (res) {
+            setResults(res.data.results);
+          } else {
+            setResults([]);
+          }
+        })
+        .finally(() => setLoading(false));
     } else {
       setResults([]);
     }
+  }, 500);
+
+  useEffect(() => {
+    if (input) {
+      setLoading(true);
+      debouncedQuery();
+    }
+    return debouncedQuery.cancel;
   }, [input]);
 
   const DropdownItem = ({
@@ -60,7 +73,9 @@ export const MultiSelect = () => {
                 ) : (
                   <>
                     {name.slice(0, indexOfBoldTxt)}
-                    <b>{name.slice(indexOfBoldTxt, indexOfBoldTxt + suggestion.length)}</b>
+                    <b>
+                      {name.slice(indexOfBoldTxt, indexOfBoldTxt + suggestion.length)}
+                    </b>
                     {name.slice(indexOfBoldTxt + suggestion.length)}
                   </>
                 )}
@@ -74,11 +89,12 @@ export const MultiSelect = () => {
   };
   return (
     <div className="flex flex-col gap-4">
+      <span className="text-slate-400 font-semibold text-xs">Type in to Search the API</span>
       <div
         className={`flex justify-between p-4 rounded-xl border border-slate-400 shadow-lg bg-white`}
         onClick={() => inputRef.current?.focus()}
       >
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
           {enteredValues.map((item, i) => (
             <MultiValue
               key={i}
@@ -102,11 +118,19 @@ export const MultiSelect = () => {
           <ChevronDownIcon className="h-6 fill-slate-500" />
         </button>
       </div>
-      <div className="max-h-[20rem] overflow-auto scroll-smooth bg-slate-50 border border-slate-400 rounded-xl">
-        {results.map((item, i) => (
-          <DropdownItem key={i} data={item} suggestion={input.toLowerCase()} />
-        ))}
-      </div>
+      {loading ? (
+        <TableSkeleton />
+      ) : (
+        <div className="max-h-[20rem] overflow-auto scroll-smooth bg-slate-50 border border-slate-400 rounded-xl">
+          {results.map((item, i) => (
+            <DropdownItem
+              key={i}
+              data={item}
+              suggestion={input.toLowerCase()}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
