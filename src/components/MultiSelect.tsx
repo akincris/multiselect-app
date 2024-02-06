@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDownIcon } from "@heroicons/react/20/solid";
 import { ICharacter } from "../interfaces/character";
-import { MultiValue } from "./MultiValue";
+import { DropdownItem, MultiValue } from "./MultiValue";
 import { getFilteredCharacters } from "../api/characters";
 import { debounce } from "lodash";
 import TableSkeleton from "./Skeleton";
 
 export const MultiSelect = () => {
   const [input, setInput] = useState("");
+  const [cursor, setCursor] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<ICharacter[]>([]);
@@ -18,6 +19,7 @@ export const MultiSelect = () => {
       getFilteredCharacters({ name: input })
         .then((res) => {
           if (res) {
+            setCursor(0);
             setResults(res.data.results);
           } else {
             setResults([]);
@@ -37,59 +39,11 @@ export const MultiSelect = () => {
     return debouncedQuery.cancel;
   }, [input]);
 
-  const DropdownItem = ({
-    data,
-    suggestion,
-  }: {
-    data: ICharacter;
-    suggestion: string;
-  }) => {
-    const { id, name, image } = data;
-    let indexOfBoldTxt = name.toLowerCase().indexOf(suggestion);
-    return (
-      <div className="p-2 px-3 flex gap-3 text-slate-600 items-center border-b border-slate-400">
-        <input
-          type="checkbox"
-          checked={!!enteredValues.find((value) => value.id === id)}
-          onChange={(value) => {
-            if (value.target.checked) {
-              setEnteredValues([...enteredValues, data]);
-            } else {
-              const updatedValues = enteredValues.filter((v) => v.id !== id);
-              setEnteredValues(updatedValues);
-            }
-          }}
-        />
-        <div className="flex gap-2 items-center">
-          <img className="rounded h-9 w-9" src={image} />
-          <div className="flex flex-col">
-            <div>
-              <span>
-                {indexOfBoldTxt === 0 ? (
-                  <>
-                    <b>{name.slice(0, suggestion.length)}</b>
-                    {name.slice(suggestion.length)}
-                  </>
-                ) : (
-                  <>
-                    {name.slice(0, indexOfBoldTxt)}
-                    <b>
-                      {name.slice(indexOfBoldTxt, indexOfBoldTxt + suggestion.length)}
-                    </b>
-                    {name.slice(indexOfBoldTxt + suggestion.length)}
-                  </>
-                )}
-              </span>
-            </div>
-            <span className="text-xs">{`${data.episode.length} episodes`}</span>
-          </div>
-        </div>
-      </div>
-    );
-  };
   return (
     <div className="flex flex-col gap-4">
-      <span className="text-slate-400 font-semibold text-xs">Type in to Search the API</span>
+      <span className="text-slate-400 font-semibold text-xs">
+        Type in to Search the API
+      </span>
       <div
         className={`flex justify-between p-4 rounded-xl border border-slate-400 shadow-lg bg-white`}
         onClick={() => inputRef.current?.focus()}
@@ -107,6 +61,15 @@ export const MultiSelect = () => {
           ))}
           <div>
             <input
+              onKeyDown={({ key }) => {
+                if (key === "ArrowDown" && cursor + 1 < results.length) {
+                  setCursor(cursor + 1);
+                } else if (key === "ArrowUp" && cursor !== 0) {
+                  setCursor(cursor - 1);
+                } else if (key === "Enter" && results.length) {
+                  setEnteredValues([...enteredValues, results[cursor]]);
+                }
+              }}
               className="outline-0"
               ref={inputRef}
               value={input}
@@ -125,8 +88,18 @@ export const MultiSelect = () => {
           {results.map((item, i) => (
             <DropdownItem
               key={i}
+              active={cursor === i}
               data={item}
               suggestion={input.toLowerCase()}
+              checked={!!enteredValues.find((value) => value.id === item.id)}
+              handleChange={(value) => {
+                if (value) {
+                  setEnteredValues([...enteredValues, item]);
+                } else {
+                  const updatedValues = enteredValues.filter((v) => v.id !== item.id);
+                  setEnteredValues(updatedValues);
+                }
+              }}
             />
           ))}
         </div>
